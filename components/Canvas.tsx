@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -21,13 +22,18 @@ interface CanvasProps {
 const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading, loadingMessage, onSelectPose, poseInstructions, currentPoseIndex, availablePoseKeys }) => {
   const [isPoseMenuOpen, setIsPoseMenuOpen] = useState(false);
   
+  const handlePoseSelectionFromMenu = (index: number) => {
+    onSelectPose(index);
+    setIsPoseMenuOpen(false); // Close menu after making a selection
+  };
+
   const handlePreviousPose = () => {
     if (isLoading || availablePoseKeys.length <= 1) return;
 
     const currentPoseInstruction = poseInstructions[currentPoseIndex];
     const currentIndexInAvailable = availablePoseKeys.indexOf(currentPoseInstruction);
     
-    // Fallback if current pose not in available list (shouldn't happen)
+    // Fallback if current pose not in available list (shouldn't happen with proper state management)
     if (currentIndexInAvailable === -1) {
         onSelectPose((currentPoseIndex - 1 + poseInstructions.length) % poseInstructions.length);
         return;
@@ -48,7 +54,7 @@ const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading
     const currentPoseInstruction = poseInstructions[currentPoseIndex];
     const currentIndexInAvailable = availablePoseKeys.indexOf(currentPoseInstruction);
 
-    // Fallback or if there are no generated poses yet
+    // If current pose is not in available keys, or no poses generated yet, proceed with global index
     if (currentIndexInAvailable === -1 || availablePoseKeys.length === 0) {
         onSelectPose((currentPoseIndex + 1) % poseInstructions.length);
         return;
@@ -115,16 +121,15 @@ const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading
       </div>
 
       {/* Pose Controls */}
-      {displayImageUrl && !isLoading && (
+      {displayImageUrl && (
         <div 
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-          onMouseEnter={() => setIsPoseMenuOpen(true)}
-          onMouseLeave={() => setIsPoseMenuOpen(false)}
+          className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-30 transition-opacity duration-300 ${isLoading ? 'opacity-50' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}
         >
           {/* Pose popover menu */}
           <AnimatePresence>
-              {isPoseMenuOpen && (
+              {isPoseMenuOpen && !isLoading && (
                   <motion.div
+                      id="pose-menu"
                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -135,9 +140,10 @@ const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading
                           {poseInstructions.map((pose, index) => (
                               <button
                                   key={pose}
-                                  onClick={() => onSelectPose(index)}
+                                  onClick={() => handlePoseSelectionFromMenu(index)}
                                   disabled={isLoading || index === currentPoseIndex}
                                   className="w-full text-left text-sm font-medium text-gray-800 p-2 rounded-md hover:bg-gray-200/70 disabled:opacity-50 disabled:bg-gray-200/70 disabled:font-bold disabled:cursor-not-allowed"
+                                  title={`Change pose to ${pose}`}
                               >
                                   {pose}
                               </button>
@@ -153,17 +159,25 @@ const Canvas: React.FC<CanvasProps> = ({ displayImageUrl, onStartOver, isLoading
               aria-label="Previous pose"
               className="p-2 rounded-full hover:bg-white/80 active:scale-90 transition-all disabled:opacity-50"
               disabled={isLoading}
+              title="Go to previous generated pose"
             >
               <ChevronLeftIcon className="w-5 h-5 text-gray-800" />
             </button>
-            <span className="text-sm font-semibold text-gray-800 w-48 text-center truncate" title={poseInstructions[currentPoseIndex]}>
+            <button
+                onClick={() => !isLoading && setIsPoseMenuOpen(!isPoseMenuOpen)}
+                aria-expanded={isPoseMenuOpen}
+                aria-controls="pose-menu"
+                className="text-sm font-semibold text-gray-800 w-48 text-center truncate px-2 py-1 rounded-md hover:bg-white/50 transition-colors"
+                title="Click to see all pose options"
+            >
               {poseInstructions[currentPoseIndex]}
-            </span>
+            </button>
             <button 
               onClick={handleNextPose}
               aria-label="Next pose"
               className="p-2 rounded-full hover:bg-white/80 active:scale-90 transition-all disabled:opacity-50"
               disabled={isLoading}
+              title="Go to next pose or generate a new one"
             >
               <ChevronRightIcon className="w-5 h-5 text-gray-800" />
             </button>

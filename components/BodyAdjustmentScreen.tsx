@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -28,12 +29,13 @@ interface SliderProps {
 const AdjustmentSlider: React.FC<SliderProps> = ({ label, value, onValueChange, minLabel, maxLabel, disabled }) => (
   <div className="w-full">
     <div className="flex justify-between items-center mb-1">
-      <label className="font-semibold text-gray-800">{label}</label>
+      <label htmlFor={`slider-${label.toLowerCase()}`} className="font-semibold text-gray-800">{label}</label>
       <span className="text-sm font-mono text-gray-600 w-12 text-center">{value}</span>
     </div>
     <div className="flex items-center gap-3">
       <span className="text-xs text-gray-500 w-12 text-center">{minLabel}</span>
       <input
+        id={`slider-${label.toLowerCase()}`}
         type="range"
         min="-100"
         max="100"
@@ -41,6 +43,8 @@ const AdjustmentSlider: React.FC<SliderProps> = ({ label, value, onValueChange, 
         onChange={(e) => onValueChange(Number(e.target.value))}
         className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
         disabled={disabled}
+        aria-label={`${label} adjustment slider`}
+        title={`Adjust model's ${label}`}
       />
       <span className="text-xs text-gray-500 w-12 text-center">{maxLabel}</span>
     </div>
@@ -53,9 +57,9 @@ const BodyAdjustmentScreen: React.FC<BodyAdjustmentScreenProps> = ({ baseModelUr
   const [isAdjusting, setIsAdjusting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleAdjustmentChange = <K extends keyof typeof adjustments>(key: K, value: number) => {
+  const handleAdjustmentChange = useCallback(<K extends keyof typeof adjustments>(key: K, value: number) => {
     setAdjustments(prev => ({ ...prev, [key]: value }));
-  };
+  }, []);
 
   const handleApplyAdjustments = useCallback(async () => {
     if (isAdjusting) return;
@@ -72,11 +76,11 @@ const BodyAdjustmentScreen: React.FC<BodyAdjustmentScreenProps> = ({ baseModelUr
     }
   }, [baseModelUrl, adjustments, isAdjusting]);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setAdjustments({ build: 0, shape: 0 });
     setAdjustedModelUrl(baseModelUrl);
     setError(null);
-  };
+  }, [baseModelUrl]);
 
   const hasChanges = adjustments.build !== 0 || adjustments.shape !== 0;
 
@@ -143,6 +147,7 @@ const BodyAdjustmentScreen: React.FC<BodyAdjustmentScreenProps> = ({ baseModelUr
               onClick={handleApplyAdjustments}
               disabled={isAdjusting || !hasChanges}
               className="w-full sm:w-auto px-6 py-3 text-base font-semibold text-gray-800 bg-white border border-gray-300 rounded-md cursor-pointer hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Apply the current body adjustments to the model"
             >
               Apply Adjustments
             </button>
@@ -150,15 +155,16 @@ const BodyAdjustmentScreen: React.FC<BodyAdjustmentScreenProps> = ({ baseModelUr
               onClick={() => onFinalized(adjustedModelUrl)}
               disabled={isAdjusting}
               className="w-full sm:w-auto relative inline-flex items-center justify-center px-8 py-3 text-base font-semibold text-white bg-gray-900 rounded-md cursor-pointer group hover:bg-gray-700 transition-colors"
+              title="Proceed to the styling studio with the adjusted model"
             >
               Proceed to Styling &rarr;
             </button>
           </div>
           <div className="w-full flex items-center justify-center lg:justify-start gap-6 mt-4 text-sm">
-             <button onClick={handleReset} disabled={isAdjusting} className="font-semibold text-gray-600 hover:underline disabled:opacity-50">
+             <button onClick={handleReset} disabled={isAdjusting} className="font-semibold text-gray-600 hover:underline disabled:opacity-50" title="Reset all sliders to default values">
                 Reset Sliders
              </button>
-             <button onClick={onStartOver} disabled={isAdjusting} className="font-semibold text-gray-600 hover:underline disabled:opacity-50">
+             <button onClick={onStartOver} disabled={isAdjusting} className="font-semibold text-gray-600 hover:underline disabled:opacity-50" title="Go back to the initial model selection screen">
                 Back to Selection
              </button>
           </div>

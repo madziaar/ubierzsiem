@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -78,7 +79,8 @@ const ChatBot: React.FC<ChatBotProps> = ({ contextImageUrl }) => {
         setMessages(prev => [...prev, newModelMessage]);
 
         try {
-            const history = messages.map(({ role, parts }) => ({ role, parts }));
+            // Filter out any messages with empty text content for history
+            const history = messages.filter(msg => msg.parts.some(part => part.text && part.text.length > 0)).map(({ role, parts }) => ({ role, parts }));
             const stream = await generateChatStream(history, newUserMessage, { useSearch, useThinkingMode });
 
             for await (const chunk of stream) {
@@ -90,7 +92,7 @@ const ChatBot: React.FC<ChatBotProps> = ({ contextImageUrl }) => {
                         ? { 
                             ...msg, 
                             parts: [{ text: (msg.parts[0].text || '') + chunkText }],
-                            groundingChunks: groundingChunks ?? msg.groundingChunks
+                            groundingChunks: groundingChunks ? (msg.groundingChunks || []).concat(groundingChunks) : msg.groundingChunks
                           } 
                         : msg
                 ));
@@ -100,7 +102,7 @@ const ChatBot: React.FC<ChatBotProps> = ({ contextImageUrl }) => {
             setError(getFriendlyErrorMessage(err, 'Failed to get response'));
             setMessages(prev => prev.map(msg => 
                 msg.id === modelMessageId 
-                    ? { ...msg, parts: [{ text: 'Sorry, I encountered an error.' }] }
+                    ? { ...msg, parts: [{ text: 'Sorry, I encountered an error. Please try again or adjust your query.' }] }
                     : msg
             ));
         } finally {
@@ -112,6 +114,11 @@ const ChatBot: React.FC<ChatBotProps> = ({ contextImageUrl }) => {
     const handlePlayAudio = async (text: string, messageId: string) => {
         if (!audioContextRef.current) {
             setError("Audio playback is not available in your browser.");
+            return;
+        }
+        if (speakingMessageId === messageId) { // Toggle off if already speaking
+            // Stop current playback logic would go here if `source` was stateful
+            setSpeakingMessageId(null);
             return;
         }
         if (speakingMessageId) return; // Prevent multiple playbacks
@@ -145,9 +152,11 @@ const ChatBot: React.FC<ChatBotProps> = ({ contextImageUrl }) => {
             const file = event.target.files[0];
             if (file.size > 10 * 1024 * 1024) { // 10MB limit
                 setError("File size exceeds 10MB. Please choose a smaller file.");
+                event.target.value = ''; // Clear input
                 return;
             }
             setAttachedFile(file);
+            event.target.value = ''; // Clear input
         }
     };
 
@@ -171,7 +180,7 @@ const ChatBot: React.FC<ChatBotProps> = ({ contextImageUrl }) => {
                     }
                     return null;
                 })}
-                 {message.groundingChunks && (
+                 {message.groundingChunks && message.groundingChunks.length > 0 && (
                     <div className="mt-3 text-xs">
                         <h4 className="font-bold text-gray-600">Sources:</h4>
                         <ol className="list-decimal list-inside space-y-1">
@@ -204,7 +213,7 @@ const ChatBot: React.FC<ChatBotProps> = ({ contextImageUrl }) => {
                     >
                         <header className="flex items-center justify-between p-4 border-b border-gray-200/80">
                             <h2 className="text-xl font-serif text-gray-900">AI Assistant</h2>
-                            <button onClick={() => setIsOpen(false)} className="p-1 rounded-full hover:bg-gray-200/70">
+                            <button onClick={() => setIsOpen(false)} className="p-1 rounded-full hover:bg-gray-200/70" title="Close chat">
                                 <XIcon className="w-5 h-5 text-gray-600"/>
                             </button>
                         </header>
@@ -218,8 +227,9 @@ const ChatBot: React.FC<ChatBotProps> = ({ contextImageUrl }) => {
                                         {msg.role === 'model' && msg.parts[0].text && !isLoading && (
                                             <button 
                                                 onClick={() => handlePlayAudio(msg.parts[0].text!, msg.id)} 
-                                                disabled={!!speakingMessageId}
-                                                className="mt-2 text-gray-500 hover:text-gray-800 disabled:opacity-50"
+                                                disabled={!!speakingMessageId && speakingMessageId !== msg.id}
+                                                className={`mt-2 text-gray-500 hover:text-gray-800 disabled:opacity-50 ${speakingMessageId === msg.id ? 'text-blue-500' : ''}`}
+                                                title={speakingMessageId === msg.id ? 'Stop speaking' : 'Listen to response'}
                                             >
                                                 <Volume2Icon className={`w-4 h-4 ${speakingMessageId === msg.id ? 'animate-pulse' : ''}`}/>
                                             </button>
@@ -242,7 +252,7 @@ const ChatBot: React.FC<ChatBotProps> = ({ contextImageUrl }) => {
                         {attachedFile && (
                              <div className="px-4 pb-2 text-xs text-gray-600 flex items-center justify-between">
                                <span>Attached: {attachedFile.name}</span>
-                               <button onClick={() => setAttachedFile(null)}><XIcon className="w-3 h-3"/></button>
+                               <button onClick={() => setAttachedFile(null)} title="Remove attachment"><XIcon className="w-3 h-3"/></button>
                              </div>
                         )}
 
@@ -250,14 +260,14 @@ const ChatBot: React.FC<ChatBotProps> = ({ contextImageUrl }) => {
                             <div className="flex items-center gap-2 px-2">
                                 <button
                                     onClick={() => setUseSearch(!useSearch)}
-                                    title="Ground with Google Search"
+                                    title="Toggle Google Search grounding"
                                     className={`p-1.5 rounded-md transition-colors ${useSearch ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-200'}`}
                                 >
                                     <SearchIcon className="w-5 h-5"/>
                                 </button>
                                 <button
                                     onClick={() => setUseThinkingMode(!useThinkingMode)}
-                                    title="Enable Thinking Mode (slower, more capable)"
+                                    title="Toggle Thinking Mode (slower, more capable, uses Pro model)"
                                     className={`p-1.5 rounded-md transition-colors ${useThinkingMode ? 'bg-purple-100 text-purple-700' : 'text-gray-500 hover:bg-gray-200'}`}
                                 >
                                     <BrainCircuitIcon className="w-5 h-5"/>
@@ -275,12 +285,13 @@ const ChatBot: React.FC<ChatBotProps> = ({ contextImageUrl }) => {
                                     placeholder="Ask a question..."
                                     className="w-full p-2 bg-transparent focus:outline-none text-sm"
                                     disabled={isLoading}
+                                    aria-label="Type your message here"
                                 />
                                 <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*,video/*" className="hidden"/>
-                                <button onClick={handleAttachmentClick} disabled={isLoading} className="p-2 text-gray-500 hover:text-gray-800">
+                                <button onClick={handleAttachmentClick} disabled={isLoading} className="p-2 text-gray-500 hover:text-gray-800" title="Attach file">
                                     <PaperclipIcon className="w-5 h-5"/>
                                 </button>
-                                <button onClick={handleSendMessage} disabled={isLoading || (!input.trim() && !attachedFile)} className="p-2 mr-1 rounded-md bg-gray-900 text-white disabled:bg-gray-300">
+                                <button onClick={handleSendMessage} disabled={isLoading || (!input.trim() && !attachedFile)} className="p-2 mr-1 rounded-md bg-gray-900 text-white disabled:bg-gray-300" title="Send message">
                                     <SendIcon className="w-5 h-5"/>
                                 </button>
                             </div>
@@ -293,6 +304,7 @@ const ChatBot: React.FC<ChatBotProps> = ({ contextImageUrl }) => {
                 onClick={() => setIsOpen(!isOpen)} 
                 className="fixed bottom-6 right-4 sm:right-6 md:right-8 w-14 h-14 bg-gray-900 rounded-full shadow-lg flex items-center justify-center text-white z-50 hover:bg-gray-700 transition-all active:scale-95"
                 aria-label={isOpen ? 'Close Chatbot' : 'Open Chatbot'}
+                title={isOpen ? 'Close Chatbot' : 'Open Chatbot'}
             >
                 <AnimatePresence mode="wait">
                     <motion.div

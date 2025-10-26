@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -31,6 +32,11 @@ const StartScreen: React.FC<StartScreenProps> = ({ onModelSelected }) => {
         setError('Please select an image file.');
         return;
     }
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        setError("File size exceeds 10MB. Please choose a smaller file.");
+        return;
+    }
+
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -55,6 +61,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onModelSelected }) => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       handleFileSelect(e.target.files[0]);
+      e.target.value = ''; // Clear the input so the same file can be selected again
     }
   };
 
@@ -86,7 +93,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onModelSelected }) => {
         {/* Default Female */}
         <div className="flex flex-col items-center gap-4">
           <img src={DEFAULT_FEMALE_MODEL_URL} alt="Default female model" className="w-full aspect-[2/3] object-cover rounded-xl shadow-lg"/>
-          <button onClick={() => onModelSelected(DEFAULT_FEMALE_MODEL_URL)} className="w-full text-center bg-gray-900 text-white font-semibold py-3 px-4 rounded-lg transition-colors hover:bg-gray-700">
+          <button onClick={() => onModelSelected(DEFAULT_FEMALE_MODEL_URL)} className="w-full text-center bg-gray-900 text-white font-semibold py-3 px-4 rounded-lg transition-colors hover:bg-gray-700" title="Use default female model">
             Use Female Model
           </button>
         </div>
@@ -94,7 +101,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onModelSelected }) => {
         {/* Default Male */}
         <div className="flex flex-col items-center gap-4">
           <img src={DEFAULT_MALE_MODEL_URL} alt="Default male model" className="w-full aspect-[2/3] object-cover rounded-xl shadow-lg"/>
-          <button onClick={() => onModelSelected(DEFAULT_MALE_MODEL_URL)} className="w-full text-center bg-gray-900 text-white font-semibold py-3 px-4 rounded-lg transition-colors hover:bg-gray-700">
+          <button onClick={() => onModelSelected(DEFAULT_MALE_MODEL_URL)} className="w-full text-center bg-gray-900 text-white font-semibold py-3 px-4 rounded-lg transition-colors hover:bg-gray-700" title="Use default male model">
             Use Male Model
           </button>
         </div>
@@ -103,7 +110,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onModelSelected }) => {
         <div className="flex flex-col items-center gap-4 p-6 bg-white/60 border border-gray-200/80 rounded-xl">
           <h2 className="text-2xl font-serif font-bold text-gray-800">Use Your Photo</h2>
           <p className="text-gray-600 text-center text-sm">Upload a clear photo for a personalized model. Full-body shots work best.</p>
-          <button onClick={() => setView('uploader')} className="w-full mt-auto flex items-center justify-center text-center bg-white border border-gray-300 text-gray-800 font-semibold py-3 px-4 rounded-lg transition-colors hover:bg-gray-100">
+          <button onClick={() => setView('uploader')} className="w-full mt-auto flex items-center justify-center text-center bg-white border border-gray-300 text-gray-800 font-semibold py-3 px-4 rounded-lg transition-colors hover:bg-gray-100" title="Upload your own photo to create a model">
             <UploadCloudIcon className="w-5 h-5 mr-2" />
             Upload Photo
           </button>
@@ -134,6 +141,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onModelSelected }) => {
                               key={option}
                               onClick={() => setSelectedExpression(option)}
                               className={`px-4 py-2 text-sm font-medium rounded-full border transition-colors duration-200 ${selectedExpression === option ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+                              title={`Set model expression to ${option}`}
                           >
                               {option}
                           </button>
@@ -143,7 +151,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onModelSelected }) => {
 
               <div className="flex flex-col items-center w-full gap-3">
                 <h2 className="text-lg font-semibold text-gray-800 mb-1">2. Upload your photo</h2>
-                <label htmlFor="image-upload-start" className="w-full relative flex items-center justify-center px-8 py-3 text-base font-semibold text-white bg-gray-900 rounded-md cursor-pointer hover:bg-gray-700 transition-colors">
+                <label htmlFor="image-upload-start" className="w-full relative flex items-center justify-center px-8 py-3 text-base font-semibold text-white bg-gray-900 rounded-md cursor-pointer hover:bg-gray-700 transition-colors" title="Select a photo from your device">
                   <UploadCloudIcon className="w-5 h-5 mr-3" />
                   Select Photo
                 </label>
@@ -151,7 +159,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onModelSelected }) => {
                 {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
               </div>
           </div>
-          <button onClick={() => setView('selector')} className="text-sm font-semibold text-gray-600 hover:underline">&larr; Back to selection</button>
+          <button onClick={() => setView('selector')} className="text-sm font-semibold text-gray-600 hover:underline" title="Go back to model selection">&larr; Back to selection</button>
         </motion.div>
     ) : (
         <motion.div
@@ -176,7 +184,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onModelSelected }) => {
             {error && 
               <div className="text-center md:text-left text-red-600 max-w-md mt-6">
                 <p className="font-semibold">Generation Failed: <span className="font-normal">{error}</span></p>
-                <button onClick={resetUploader} className="mt-2 text-sm font-semibold text-gray-700 hover:underline">Try Again</button>
+                <button onClick={resetUploader} className="mt-2 text-sm font-semibold text-gray-700 hover:underline" title="Try creating a model again">Try Again</button>
               </div>
             }
             
@@ -190,12 +198,14 @@ const StartScreen: React.FC<StartScreenProps> = ({ onModelSelected }) => {
                   <button 
                     onClick={resetUploader}
                     className="w-full sm:w-auto px-6 py-3 text-base font-semibold text-gray-700 bg-gray-200 rounded-md cursor-pointer hover:bg-gray-300 transition-colors"
+                    title="Choose a different photo to create a model"
                   >
                     Use Different Photo
                   </button>
                   <button 
                     onClick={() => onModelSelected(generatedModelUrl)}
                     className="w-full sm:w-auto relative inline-flex items-center justify-center px-8 py-3 text-base font-semibold text-white bg-gray-900 rounded-md cursor-pointer group hover:bg-gray-700 transition-colors"
+                    title="Accept this model and proceed to styling"
                   >
                     <CheckCircleIcon className="w-5 h-5 mr-2"/>
                     Accept and Continue

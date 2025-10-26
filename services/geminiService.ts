@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -33,7 +34,14 @@ const dataUrlToPart = (dataUrl: string) => {
 const handleApiResponse = (response: GenerateContentResponse): string => {
     if (response.promptFeedback?.blockReason) {
         const { blockReason, blockReasonMessage } = response.promptFeedback;
-        const errorMessage = `Request was blocked. Reason: ${blockReason}. ${blockReasonMessage || ''}`;
+        let errorMessage = `Request was blocked by safety filters. Reason: ${blockReason}.`;
+        if (blockReasonMessage) {
+            errorMessage += ` ${blockReasonMessage}`;
+        }
+        // Provide guidance based on common block reasons
+        if (blockReason === 'SAFETY') {
+            errorMessage += ` Please try adjusting your prompt or image to be less ambiguous, less sensitive, or more specific.`;
+        }
         throw new Error(errorMessage);
     }
 
@@ -48,11 +56,16 @@ const handleApiResponse = (response: GenerateContentResponse): string => {
 
     const finishReason = response.candidates?.[0]?.finishReason;
     if (finishReason && finishReason !== 'STOP') {
-        const errorMessage = `Image generation stopped unexpectedly. Reason: ${finishReason}. This often relates to safety settings.`;
+        const errorMessage = `Image generation stopped unexpectedly. Reason: ${finishReason}. This often relates to safety settings or resource limits. Please try a different prompt or image.`;
         throw new Error(errorMessage);
     }
     const textFeedback = response.text?.trim();
-    const errorMessage = `The AI model did not return an image. ` + (textFeedback ? `The model responded with text: "${textFeedback}"` : "This can happen due to safety filters or if the request is too complex. Please try a different image.");
+    let errorMessage = `The AI model did not return an image. This can happen due to safety filters, if the request is too complex, or if the model could not fulfill the request.`;
+    if (textFeedback) {
+        errorMessage += ` The model responded with text: "${textFeedback}".`;
+    } else {
+        errorMessage += ` Please try a different image or prompt.`;
+    }
     throw new Error(errorMessage);
 };
 
@@ -83,7 +96,7 @@ export const generateVirtualTryOnImage = async (modelImageUrl: string, itemImage
 1.  **Garment Placement:** Intelligently place the new garment from the 'garment image' onto the person in the 'model image'. If the new garment is a top (shirt, jacket, etc.), it should replace any existing top. If it's a bottom (pants, skirt), it should replace any existing bottom. The new garment should layer realistically over any existing clothing that would naturally be worn underneath (e.g., a jacket over a shirt).
 2.  **Preserve the Model:** The person's face, hair, body shape, and pose from the 'model image' MUST remain unchanged.
 3.  **Preserve the Background:** The entire background from the 'model image' MUST be preserved perfectly.
-4.  **Master-Level Digital Tailoring (Crucial):** The final image must be indistinguishable from a real photograph. The garment's fit is paramount.
+4.  **Master-Level Digital Tailoring (Crucial)::** The final image must be indistinguishable from a real photograph. The garment's fit is paramount.
     *   **Fabric Physics Simulation:** Go beyond a simple drape. Simulate the specific weight, stiffness, and texture of the fabric. Denim should show its characteristic rigidity and seam puckering. Silk should have soft, flowing folds and specular highlights. Cotton should have fine, subtle wrinkles.
     *   **Anatomically Correct Conformance:** The garment must conform to the underlying human form with extreme precision. It should show tension where the fabric is stretched over the body (e.g., shoulders, chest, hips) and compression with realistic folds where the body bends (e.g., inside of elbows, waist).
     *   **Photorealistic Texture and Lighting:** The garment's texture must be perfectly preserved and mapped onto the draped form. Light must interact with this texture realistically—creating subtle shadows within the weave of a knit sweater or a sharp sheen on leather. Shadows cast by the body onto the garment, and by the garment's folds onto itself, must be soft, accurate, and perfectly consistent with the single light source of the original 'model image'.
@@ -195,19 +208,21 @@ export const segmentGarment = async (garmentImage: File): Promise<string[]> => {
     const prompt = `You are a meticulous fashion expert AI specializing in garment analysis for e-commerce. Your task is to analyze the provided image and identify all distinct, primary, and separable clothing items.
 
 **Instructions:**
-1.  **Identify Primary Garments:** Focus on major clothing items like 'shirt', 'trousers', 'jacket', 'dress', 'skirt', 'shorts', etc.
-2.  **Exclude Accessories:** Do NOT identify accessories such as belts, jewelry, hats, bags, or shoes.
-3.  **Handle Single Items:** If the image shows a single item (e.g., a dress, a jumpsuit, a coat), identify it as one item.
-4.  **Handle Multiple Items:** If the image shows a combined outfit (e.g., a shirt and pants, a suit with a jacket and trousers), identify each separable item.
-5.  **Output Format:** Return a JSON array of strings, with each string being the lowercase name of a single identified garment.
+1.  **Identify Primary Garments ONLY:** Focus exclusively on major clothing items like 'shirt', 'trousers', 'jacket', 'dress', 'skirt', 'shorts', 'coat', 'sweater', 'blouse', 'jeans', 'pants', etc.
+2.  **Exclude Accessories & Sub-items:** Do NOT identify accessories such as belts, jewelry, hats, bags, shoes, glasses, or other small items. Do not identify parts of clothing like 'collar', 'sleeve', 'pocket', etc. Only complete, separable garments.
+3.  **Handle Single Items:** If the image clearly shows a single, unified item (e.g., a dress, a jumpsuit, a single coat), identify it as one item.
+4.  **Handle Multiple Items:** If the image shows a combined outfit consisting of multiple distinct and separable garments (e.g., a shirt and pants, a suit with a jacket and trousers), identify EACH separable item individually.
+5.  **Output Format:** Return a JSON array of strings, with each string being the lowercase name of a single identified garment. Ensure there are no duplicates.
 
 **Examples:**
 -   An image of a suit -> \`["blazer", "trousers"]\`
 -   An image of a t-shirt and jeans -> \`["t-shirt", "jeans"]\`
 -   An image of a single red dress -> \`["dress"]\`
 -   An image of a winter coat -> \`["coat"]\`
+-   An image of a shirt with a belt -> \`["shirt"]\` (belt is excluded)
+-   An image with a dress and a jacket -> \`["dress", "jacket"]\`
 
-**Crucially:** If you find only one item, return an array containing that single item. If no discernible clothing is found, return an empty array.`;
+**Crucially:** If you find only one item, return an array containing that single item. If no discernible clothing (as per the above rules) is found, return an empty array.`;
     
     const response = await ai.models.generateContent({
         model: textModel,
@@ -227,13 +242,17 @@ export const segmentGarment = async (garmentImage: File): Promise<string[]> => {
 
     const jsonText = response.text?.trim();
     if (!jsonText) {
-        throw new Error("Model returned an empty response for garment segmentation.");
+        throw new Error("Model returned an empty response for garment segmentation. Please try an image with clear clothing items.");
     }
     try {
         const result = JSON.parse(jsonText);
-        return Array.isArray(result) ? result : [];
+        // Ensure unique, non-empty strings and convert to array if not already.
+        const cleanedResult = Array.isArray(result) 
+            ? Array.from(new Set(result.map(s => String(s).trim()).filter(s => s.length > 0))) 
+            : [];
+        return cleanedResult;
     } catch (e) {
-        throw new Error("Failed to parse AI response for garment segmentation.");
+        throw new Error("Failed to parse AI response for garment segmentation. Please ensure the image clearly shows distinct clothing items.");
     }
 };
 
@@ -242,11 +261,12 @@ export const extractGarment = async (originalImageUrl: string, garmentNameToExtr
     const prompt = `You are an expert AI graphic designer specializing in pixel-perfect product image extraction for fashion e-commerce. Your task is to isolate and extract a specific clothing item from a larger image.
 
 **Instructions:**
-1.  **Target Item:** From the provided image, precisely and completely extract the item named: '${garmentNameToExtract}'.
-2.  **Pixel-Perfect Masking:** Create a perfect cutout of the garment. The edges must be clean and smooth, following the item's natural contours.
-3.  **Transparent Background:** The output image MUST have a fully transparent background (alpha channel). Remove all original background pixels and any other clothing items or objects.
+1.  **Target Item:** From the provided image, precisely and completely extract the ONLY the item named: '${garmentNameToExtract}'. Ensure it's the *entire* item.
+2.  **Pixel-Perfect Masking:** Create a perfect cutout of the garment. The edges must be clean and smooth, following the item's natural contours. Avoid any jagged or blurry edges.
+3.  **Transparent Background:** The output image MUST have a fully transparent background (alpha channel). Remove all original background pixels and any other clothing items or objects not explicitly requested.
 4.  **Preserve Detail:** The garment's original texture, color, and internal details (seams, buttons, patterns) must be perfectly preserved.
 5.  **Lighting and Shadows:** Retain the natural form shadows and lighting ON the garment itself. Do NOT include any shadows the garment was casting onto the background or other items.
+6.  **Positioning:** Present the extracted garment clearly, centrally, and with a good scale, as if it were a standalone product image.
 
 **Output:** Return ONLY the final, high-quality image of the extracted garment on a transparent background.`;
 
@@ -305,8 +325,8 @@ export const generateChatStream = async (
     const { useSearch, useThinkingMode } = config;
 
     let model = 'gemini-2.5-flash';
-    const generationConfig: any = {};
-    const tools: any[] = [];
+    const generationConfig: any = {}; // Use `GenerateContentParameters['config']` type for better safety
+    const tools: any[] = []; // Use `Tool` type
 
     if (useSearch) {
         tools.push({ googleSearch: {} });
@@ -319,11 +339,21 @@ export const generateChatStream = async (
 
     const contents = [...history, { role: newMessage.role, parts: newMessage.parts }];
 
+    // The Gemini API expects 'config' as a top-level property,
+    // and both 'tools' and 'generationConfig' go inside it.
+    const finalConfig: any = {};
+    if (tools.length > 0) {
+        finalConfig.tools = tools;
+    }
+    if (Object.keys(generationConfig).length > 0) {
+        Object.assign(finalConfig, generationConfig);
+    }
+
+
     const response = await ai.models.generateContentStream({
         model,
         contents,
-        ...(tools.length > 0 && { config: { tools } }),
-        ...(Object.keys(generationConfig).length > 0 && { config: { ...generationConfig, ...(tools.length > 0 && { tools }) } }),
+        ...(Object.keys(finalConfig).length > 0 && { config: finalConfig }),
     });
 
     return response;

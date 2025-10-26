@@ -10,17 +10,32 @@ import { Trash2Icon, PlusIcon } from './icons';
 interface OutfitStackProps {
   outfitHistory: OutfitLayer[];
   onRemoveLastGarment: () => void;
+  // FIX: Added onClearOutfit to props to match usage in App.tsx
+  onClearOutfit: () => void;
   onAddGarment: () => void;
 }
 
-const OutfitStack: React.FC<OutfitStackProps> = ({ outfitHistory, onRemoveLastGarment, onAddGarment }) => {
+const OutfitStack: React.FC<OutfitStackProps> = ({ outfitHistory, onRemoveLastGarment, onClearOutfit, onAddGarment }) => {
   return (
     <div className="h-full flex flex-col">
-      <h2 className="text-xl font-serif tracking-wider text-gray-800 border-b border-gray-400/50 pb-2 mb-3">Outfit Stack</h2>
+      {/* FIX: Updated header to include the clear outfit button */}
+      <div className="flex justify-between items-center border-b border-gray-400/50 pb-2 mb-3">
+        <h2 className="text-xl font-serif tracking-wider text-gray-800">Outfit Stack</h2>
+        {outfitHistory.length > 1 && (
+          <button
+            onClick={onClearOutfit}
+            className="text-gray-500 hover:text-red-600 transition-colors p-2 rounded-md hover:bg-red-50 -mr-2"
+            aria-label="Clear all garments"
+            title="Clear all garments"
+          >
+            <Trash2Icon className="w-5 h-5" />
+          </button>
+        )}
+      </div>
       <div className="space-y-2 flex-grow">
         {outfitHistory.map((layer, index) => (
           <div
-            key={layer.garment?.id || 'base'}
+            key={layer.garment?.id || 'base-model'}
             className="flex items-center justify-between bg-white/50 p-2 rounded-lg animate-fade-in border border-gray-200/80 shadow-sm"
           >
             <div className="flex items-center overflow-hidden">
@@ -39,6 +54,7 @@ const OutfitStack: React.FC<OutfitStackProps> = ({ outfitHistory, onRemoveLastGa
                 onClick={onRemoveLastGarment}
                 className="flex-shrink-0 text-gray-500 hover:text-red-600 transition-colors p-2 rounded-md hover:bg-red-50"
                 aria-label={`Remove ${layer.garment?.name}`}
+                title={`Remove ${layer.garment?.name}`}
               >
                 <Trash2Icon className="w-5 h-5" />
               </button>
@@ -46,12 +62,13 @@ const OutfitStack: React.FC<OutfitStackProps> = ({ outfitHistory, onRemoveLastGa
           </div>
         ))}
         {outfitHistory.length === 1 && (
-            <p className="text-center text-sm text-gray-500 pt-4">Your stacked items will appear here. Start by adding a garment.</p>
+            <p className="text-center text-sm text-gray-500 pt-4 px-2">Your style journey begins! Add a garment from the wardrobe to start creating your look.</p>
         )}
       </div>
        <button 
           onClick={onAddGarment}
           className="mt-4 w-full flex items-center justify-center text-center bg-gray-900 text-white font-semibold py-3 px-4 rounded-lg transition-colors duration-200 ease-in-out hover:bg-gray-700 active:scale-95 text-base"
+          title="Add a new garment from your wardrobe"
       >
           <PlusIcon className="w-5 h-5 mr-2" />
           Add Garment
