@@ -9,7 +9,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Header from './components/Header';
 import StartScreen from './components/StartScreen';
 import BodyAdjustmentScreen from './components/BodyAdjustmentScreen';
-import Canvas from './components/Canvas';
+import { Compare } from './components/ui/compare';
 import WardrobePanel from './components/WardrobeModal';
 import ImageEditPanel from './components/ImageEditPanel';
 import OutfitStack from './components/CurrentOutfitPanel';
@@ -20,7 +20,7 @@ import { OutfitLayer, WardrobeItem } from './types';
 import { generateVirtualTryOnImage, generatePoseVariation, editImageWithPrompt } from './services/geminiService';
 import { getFriendlyErrorMessage } from './lib/utils';
 import { defaultWardrobe } from './wardrobe';
-import { BellIcon, ShirtIcon, SparklesIcon } from './components/icons';
+import { BellIcon, ShirtIcon, SparklesIcon, RotateCcwIcon, ChevronLeftIcon, ChevronRightIcon } from './components/icons';
 import { AnimatePresence, motion } from 'framer-motion';
 
 type AppState = 'start' | 'adjust' | 'dressing';
@@ -51,6 +51,7 @@ const App: React.FC = () => {
   const [activePanel, setActivePanel] = useState<ActivePanel>('wardrobe');
   const [wardrobe, setWardrobe] = useState<WardrobeItem[]>(defaultWardrobe);
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
+  const [isPoseMenuOpen, setIsPoseMenuOpen] = useState(false);
 
 
   useEffect(() => {
@@ -167,6 +168,13 @@ const App: React.FC = () => {
     }
   }, [outfitHistory.length]);
 
+  const handleClearOutfit = useCallback(() => {
+    if (outfitHistory.length > 1) {
+      setOutfitHistory(prev => [prev[0]]);
+      setCurrentPoseIndex(0);
+    }
+  }, [outfitHistory.length]);
+
   const handleEditImage = useCallback(async (prompt: string) => {
     if (!displayImageUrl) return;
 
@@ -180,22 +188,70 @@ const App: React.FC = () => {
         setOutfitHistory(prev => {
             const newHistory = [...prev];
             const lastLayer = newHistory[newHistory.length - 1];
-            // This edit applies only to the current pose.
-            // Other poses for this layer are now out of sync.
-            // For a better UX, we could clear them, but for simplicity, we just update the current one.
-            lastLayer.poseImages[currentPoseInstruction] = editedImageUrl;
+            // The edit creates a new canonical image for this layer.
+            // To maintain consistency, we reset the poses, making the edited image the new base pose.
+            lastLayer.poseImages = { [POSE_INSTRUCTIONS[0]]: editedImageUrl };
             return newHistory;
         });
+        setCurrentPoseIndex(0); // Reset to the base pose
     } catch (err) {
         setError(getFriendlyErrorMessage(err, 'Failed to edit image'));
     } finally {
         setIsLoading(false);
     }
-  }, [displayImageUrl, currentPoseInstruction]);
+  }, [displayImageUrl, currentPoseInstruction, setCurrentPoseIndex]);
 
   const handleRemoveWardrobeItem = useCallback((itemId: string) => {
     setWardrobe(prev => prev.filter(item => item.id !== itemId));
   }, []);
+
+  const handlePreviousPose = () => {
+    if (isLoading || availablePoseKeys.length <= 1) return;
+
+    const currentPoseInstruction = POSE_INSTRUCTIONS[currentPoseIndex];
+    const currentIndexInAvailable = availablePoseKeys.indexOf(currentPoseInstruction);
+
+    // Fallback if current pose not in available list (shouldn't happen)
+    if (currentIndexInAvailable === -1) {
+        handleSelectPose((currentPoseIndex - 1 + POSE_INSTRUCTIONS.length) % POSE_INSTRUCTIONS.length);
+        return;
+    }
+
+    const prevIndexInAvailable = (currentIndexInAvailable - 1 + availablePoseKeys.length) % availablePoseKeys.length;
+    const prevPoseInstruction = availablePoseKeys[prevIndexInAvailable];
+    const newGlobalPoseIndex = POSE_INSTRUCTIONS.indexOf(prevPoseInstruction);
+
+    if (newGlobalPoseIndex !== -1) {
+        handleSelectPose(newGlobalPoseIndex);
+    }
+  };
+
+  const handleNextPose = () => {
+    if (isLoading) return;
+
+    const currentPoseInstruction = POSE_INSTRUCTIONS[currentPoseIndex];
+    const currentIndexInAvailable = availablePoseKeys.indexOf(currentPoseInstruction);
+
+    // Fallback or if there are no generated poses yet
+    if (currentIndexInAvailable === -1 || availablePoseKeys.length === 0) {
+        handleSelectPose((currentPoseIndex + 1) % POSE_INSTRUCTIONS.length);
+        return;
+    }
+
+    const nextIndexInAvailable = currentIndexInAvailable + 1;
+    if (nextIndexInAvailable < availablePoseKeys.length) {
+        // There is another generated pose, navigate to it
+        const nextPoseInstruction = availablePoseKeys[nextIndexInAvailable];
+        const newGlobalPoseIndex = POSE_INSTRUCTIONS.indexOf(nextPoseInstruction);
+        if (newGlobalPoseIndex !== -1) {
+            handleSelectPose(newGlobalPoseIndex);
+        }
+    } else {
+        // At the end of generated poses, generate the next one from the master list
+        const newGlobalPoseIndex = (currentPoseIndex + 1) % POSE_INSTRUCTIONS.length;
+        handleSelectPose(newGlobalPoseIndex);
+    }
+  };
 
   if (appState === 'start') {
     return (
@@ -218,17 +274,94 @@ const App: React.FC = () => {
         <Header />
         <main className="flex-grow flex overflow-hidden">
           {/* Main Canvas Area */}
-          <div className="flex-grow h-full relative">
-              <Canvas 
-                  displayImageUrl={displayImageUrl}
-                  onStartOver={handleStartOver}
-                  isLoading={isLoading}
-                  loadingMessage={loadingMessage}
-                  onSelectPose={handleSelectPose}
-                  poseInstructions={POSE_INSTRUCTIONS}
-                  currentPoseIndex={currentPoseIndex}
-                  availablePoseKeys={availablePoseKeys}
-              />
+          <div className="flex-grow h-full relative flex items-center justify-center p-4 group">
+            <Compare
+              firstImage={outfitHistory[0]?.poseImages[POSE_INSTRUCTIONS[0]]}
+              secondImage={displayImageUrl}
+              className="h-full aspect-[2/3] rounded-2xl overflow-hidden shadow-lg"
+              slideMode="drag"
+            />
+            {/* Start Over Button */}
+            <button
+                onClick={handleStartOver}
+                title="Start Over"
+                className="absolute top-8 left-8 z-30 flex items-center justify-center text-center bg-white/60 border border-gray-300/80 text-gray-700 font-semibold py-2 px-4 rounded-full transition-all duration-200 ease-in-out hover:bg-white hover:border-gray-400 active:scale-95 text-sm backdrop-blur-sm"
+            >
+                <RotateCcwIcon className="w-4 h-4 mr-2" />
+                Start Over
+            </button>
+
+            {/* Pose Controls */}
+            {displayImageUrl && !isLoading && (
+              <div
+                className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                onMouseEnter={() => setIsPoseMenuOpen(true)}
+                onMouseLeave={() => setIsPoseMenuOpen(false)}
+              >
+                <AnimatePresence>
+                    {isPoseMenuOpen && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            transition={{ duration: 0.2, ease: "easeOut" }}
+                            className="absolute bottom-full mb-3 w-64 bg-white/80 backdrop-blur-lg rounded-xl p-2 border border-gray-200/80"
+                        >
+                            <div className="grid grid-cols-2 gap-2">
+                                {POSE_INSTRUCTIONS.map((pose, index) => (
+                                    <button
+                                        key={pose}
+                                        onClick={() => handleSelectPose(index)}
+                                        disabled={isLoading || index === currentPoseIndex}
+                                        className="w-full text-left text-sm font-medium text-gray-800 p-2 rounded-md hover:bg-gray-200/70 disabled:opacity-50 disabled:bg-gray-200/70 disabled:font-bold disabled:cursor-not-allowed"
+                                    >
+                                        {pose}
+                                    </button>
+                                ))}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                <div className="flex items-center justify-center gap-2 bg-white/60 backdrop-blur-md rounded-full p-2 border border-gray-300/50">
+                  <button
+                    onClick={handlePreviousPose}
+                    aria-label="Previous pose"
+                    className="p-2 rounded-full hover:bg-white/80 active:scale-90 transition-all disabled:opacity-50"
+                    disabled={isLoading}
+                  >
+                    <ChevronLeftIcon className="w-5 h-5 text-gray-800" />
+                  </button>
+                  <span className="text-sm font-semibold text-gray-800 w-48 text-center truncate" title={currentPoseInstruction}>
+                    {currentPoseInstruction}
+                  </span>
+                  <button
+                    onClick={handleNextPose}
+                    aria-label="Next pose"
+                    className="p-2 rounded-full hover:bg-white/80 active:scale-90 transition-all disabled:opacity-50"
+                    disabled={isLoading}
+                  >
+                    <ChevronRightIcon className="w-5 h-5 text-gray-800" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <AnimatePresence>
+              {isLoading && (
+                  <motion.div
+                      className="absolute inset-0 bg-white/80 backdrop-blur-md flex flex-col items-center justify-center z-20 rounded-lg"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                  >
+                      <Spinner />
+                      {loadingMessage && (
+                          <p className="text-lg font-serif text-gray-700 mt-4 text-center px-4">{loadingMessage}</p>
+                      )}
+                  </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Right Sidebar */}
@@ -250,6 +383,7 @@ const App: React.FC = () => {
                 outfitHistory={outfitHistory}
                 onRemoveLastGarment={handleRemoveLastGarment}
                 onAddGarment={() => setActivePanel('wardrobe')}
+                onClearOutfit={handleClearOutfit}
             />
 
             <div className="mt-6 border-t border-gray-300/80 pt-6">

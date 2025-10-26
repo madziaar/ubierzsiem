@@ -11,12 +11,20 @@ interface OutfitStackProps {
   outfitHistory: OutfitLayer[];
   onRemoveLastGarment: () => void;
   onAddGarment: () => void;
+  onClearOutfit: () => void;
 }
 
-const OutfitStack: React.FC<OutfitStackProps> = ({ outfitHistory, onRemoveLastGarment, onAddGarment }) => {
+const OutfitStack: React.FC<OutfitStackProps> = ({ outfitHistory, onRemoveLastGarment, onAddGarment, onClearOutfit }) => {
   return (
     <div className="h-full flex flex-col">
-      <h2 className="text-xl font-serif tracking-wider text-gray-800 border-b border-gray-400/50 pb-2 mb-3">Outfit Stack</h2>
+      <div className="flex justify-between items-center border-b border-gray-400/50 pb-2 mb-3">
+        <h2 className="text-xl font-serif tracking-wider text-gray-800">Current Outfit</h2>
+        {outfitHistory.length > 1 && (
+          <button onClick={onClearOutfit} className="text-sm font-semibold text-gray-600 hover:text-red-600 hover:underline">
+            Clear Outfit
+          </button>
+        )}
+      </div>
       <div className="space-y-2 flex-grow">
         {outfitHistory.map((layer, index) => (
           <div

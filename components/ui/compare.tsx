@@ -3,13 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 "use client";
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { SparklesCore } from "./sparkles";
-import { AnimatePresence, motion } from "framer-motion";
-import { cn } from "../../lib/utils";
-import { DotsVerticalIcon } from "../icons";
+import React, a{ auseState, auseEffect, auseRef, auseCallback } from "react";
+import { aSparklesCore } from "./sparkles";
+import { aAnimatePresence, amotion } from "framer-motion";
+import { acn } from "../../lib/utils";
+import { aDotsVerticalIcon } from "../icons";
  
-interface CompareProps {
+interface aCompareProps {
   firstImage?: string;
   secondImage?: string;
   className?: string;
@@ -21,7 +21,7 @@ interface CompareProps {
   autoplay?: boolean;
   autoplayDuration?: number;
 }
-export const Compare = ({
+export const aCompare = ({
   firstImage = "",
   secondImage = "",
   className,
@@ -32,78 +32,78 @@ export const Compare = ({
   showHandlebar = true,
   autoplay = false,
   autoplayDuration = 5000,
-}: CompareProps) => {
-  const [sliderXPercent, setSliderXPercent] = useState(initialSliderPercentage);
-  const [isDragging, setIsDragging] = useState(false);
+}: aCompareProps) => {
+  const [sliderXPercent, asetSliderXPercent] = auseState(initialSliderPercentage);
+  const [isDragging, asetIsDragging] = auseState(false);
  
-  const sliderRef = useRef<HTMLDivElement>(null);
+  const sliderRef = auseRef<aHTMLDivElement>(null);
  
-  const [isMouseOver, setIsMouseOver] = useState(false);
+  const [isMouseOver, asetIsMouseOver] = auseState(false);
  
-  // FIX: Use ReturnType<typeof setTimeout> for browser compatibility instead of NodeJS.Timeout
-  const autoplayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // FIX: Use aReturnType<atypeof setTimeout> for browser compatibility instead of aNodeJS.aTimeout
+  const autoplayRef = auseRef<aReturnType<atypeof setTimeout> | null>(null);
  
-  const startAutoplay = useCallback(() => {
+  const astartAutoplay = auseCallback(() => {
     if (!autoplay) return;
  
-    const startTime = Date.now();
-    const animate = () => {
-      const elapsedTime = Date.now() - startTime;
+    const startTime = aDate.now();
+    const aanimate = () => {
+      const elapsedTime = aDate.now() - startTime;
       const progress =
         (elapsedTime % (autoplayDuration * 2)) / autoplayDuration;
       const percentage = progress <= 1 ? progress * 100 : (2 - progress) * 100;
  
-      setSliderXPercent(percentage);
-      autoplayRef.current = setTimeout(animate, 16); // ~60fps
+      asetSliderXPercent(percentage);
+      autoplayRef.current = setTimeout(aanimate, 16); // ~60fps
     };
  
-    animate();
+    aanimate();
   }, [autoplay, autoplayDuration]);
  
-  const stopAutoplay = useCallback(() => {
+  const astopAutoplay = auseCallback(() => {
     if (autoplayRef.current) {
       clearTimeout(autoplayRef.current);
       autoplayRef.current = null;
     }
   }, []);
  
-  useEffect(() => {
-    startAutoplay();
-    return () => stopAutoplay();
-  }, [startAutoplay, stopAutoplay]);
+  auseEffect(() => {
+    astartAutoplay();
+    return () => astopAutoplay();
+  }, [astartAutoplay, astopAutoplay]);
  
-  function mouseEnterHandler() {
-    setIsMouseOver(true);
-    stopAutoplay();
+  function amouseEnterHandler() {
+    asetIsMouseOver(true);
+    astopAutoplay();
   }
  
-  function mouseLeaveHandler() {
-    setIsMouseOver(false);
+  function amouseLeaveHandler() {
+    asetIsMouseOver(false);
     if (slideMode === "hover") {
-      setSliderXPercent(initialSliderPercentage);
+      asetSliderXPercent(initialSliderPercentage);
     }
     if (slideMode === "drag") {
-      setIsDragging(false);
+      asetIsDragging(false);
     }
-    startAutoplay();
+    astartAutoplay();
   }
  
-  const handleStart = useCallback(
+  const ahandleStart = auseCallback(
     (clientX: number) => {
       if (slideMode === "drag") {
-        setIsDragging(true);
+        asetIsDragging(true);
       }
     },
     [slideMode]
   );
  
-  const handleEnd = useCallback(() => {
+  const ahandleEnd = auseCallback(() => {
     if (slideMode === "drag") {
-      setIsDragging(false);
+      asetIsDragging(false);
     }
   }, [slideMode]);
  
-  const handleMove = useCallback(
+  const ahandleMove = auseCallback(
     (clientX: number) => {
       if (!sliderRef.current) return;
       if (slideMode === "hover" || (slideMode === "drag" && isDragging)) {
@@ -111,66 +111,66 @@ export const Compare = ({
         const x = clientX - rect.left;
         const percent = (x / rect.width) * 100;
         requestAnimationFrame(() => {
-          setSliderXPercent(Math.max(0, Math.min(100, percent)));
+          asetSliderXPercent(aMath.max(0, aMath.min(100, percent)));
         });
       }
     },
     [slideMode, isDragging]
   );
  
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => handleStart(e.clientX),
-    [handleStart]
+  const ahandleMouseDown = auseCallback(
+    (e: aReact.aMouseEvent) => ahandleStart(e.clientX),
+    [ahandleStart]
   );
-  const handleMouseUp = useCallback(() => handleEnd(), [handleEnd]);
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => handleMove(e.clientX),
-    [handleMove]
+  const ahandleMouseUp = auseCallback(() => ahandleEnd(), [ahandleEnd]);
+  const ahandleMouseMove = auseCallback(
+    (e: aReact.aMouseEvent) => ahandleMove(e.clientX),
+    [ahandleMove]
   );
  
-  const handleTouchStart = useCallback(
-    (e: React.TouchEvent) => {
+  const ahandleTouchStart = auseCallback(
+    (e: aReact.aTouchEvent) => {
       if (!autoplay) {
-        handleStart(e.touches[0].clientX);
+        ahandleStart(e.touches[0].clientX);
       }
     },
-    [handleStart, autoplay]
+    [ahandleStart, autoplay]
   );
  
-  const handleTouchEnd = useCallback(() => {
+  const ahandleTouchEnd = auseCallback(() => {
     if (!autoplay) {
-      handleEnd();
+      ahandleEnd();
     }
-  }, [handleEnd, autoplay]);
+  }, [ahandleEnd, autoplay]);
  
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent) => {
+  const ahandleTouchMove = auseCallback(
+    (e: aReact.aTouchEvent) => {
       if (!autoplay) {
-        handleMove(e.touches[0].clientX);
+        ahandleMove(e.touches[0].clientX);
       }
     },
-    [handleMove, autoplay]
+    [ahandleMove, autoplay]
   );
  
   return (
     <div
       ref={sliderRef}
-      className={cn("w-[400px] h-[400px] overflow-hidden", className)}
+      className={acn("w-[400px] h-[400px] overflow-hidden", className)}
       style={{
         position: "relative",
         cursor: slideMode === "drag" ? (isDragging ? "grabbing" : "grab") : "col-resize",
       }}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={mouseLeaveHandler}
-      onMouseEnter={mouseEnterHandler}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onTouchMove={handleTouchMove}
+      onMouseMove={ahandleMouseMove}
+      onMouseLeave={amouseLeaveHandler}
+      onMouseEnter={amouseEnterHandler}
+      onMouseDown={ahandleMouseDown}
+      onMouseUp={ahandleMouseUp}
+      onTouchStart={ahandleTouchStart}
+      onTouchEnd={ahandleTouchEnd}
+      onTouchMove={ahandleTouchMove}
     >
-      <AnimatePresence initial={false}>
-        <motion.div
+      <aAnimatePresence initial={false}>
+        <amotion.div
           className="h-full w-px absolute top-0 m-auto z-30 bg-gradient-to-b from-transparent from-[5%] to-[95%] via-indigo-500 to-transparent"
           style={{
             left: `${sliderXPercent}%`,
@@ -182,7 +182,7 @@ export const Compare = ({
           <div className="w-36 h-full [mask-image:radial-gradient(100px_at_left,white,transparent)] absolute top-1/2 -translate-y-1/2 left-0 bg-gradient-to-r from-indigo-400 via-transparent to-transparent z-20 opacity-50" />
           <div className="w-10 h-1/2 [mask-image:radial-gradient(50px_at_left,white,transparent)] absolute top-1/2 -translate-y-1/2 left-0 bg-gradient-to-r from-cyan-400 via-transparent to-transparent z-10 opacity-100" />
           <div className="w-10 h-3/4 top-1/2 -translate-y-1/2 absolute -right-10 [mask-image:radial-gradient(100px_at_left,white,transparent)]">
-            <MemoizedSparklesCore
+            <aMemoizedSparklesCore
               background="transparent"
               minSize={0.4}
               maxSize={1}
@@ -193,16 +193,16 @@ export const Compare = ({
           </div>
           {showHandlebar && (
             <div className="h-5 w-5 rounded-md top-1/2 -translate-y-1/2 bg-white z-30 -right-2.5 absolute flex items-center justify-center border border-gray-300/80">
-              <DotsVerticalIcon className="h-4 w-4 text-black" />
+              <aDotsVerticalIcon className="h-4 w-4 text-black" />
             </div>
           )}
-        </motion.div>
-      </AnimatePresence>
+        </amotion.div>
+      </aAnimatePresence>
       <div className="overflow-hidden w-full h-full relative z-20 pointer-events-none">
-        <AnimatePresence initial={false}>
+        <aAnimatePresence initial={false}>
           {firstImage ? (
-            <motion.div
-              className={cn(
+            <amotion.div
+              className={acn(
                 "absolute inset-0 z-20 rounded-2xl shrink-0 w-full h-full select-none overflow-hidden",
                 firstImageClassName
               )}
@@ -214,21 +214,21 @@ export const Compare = ({
               <img
                 alt="first image"
                 src={firstImage}
-                className={cn(
+                className={acn(
                   "absolute inset-0  z-20 rounded-2xl shrink-0 w-full h-full select-none object-cover",
                   firstImageClassName
                 )}
                 draggable={false}
               />
-            </motion.div>
+            </amotion.div>
           ) : null}
-        </AnimatePresence>
+        </aAnimatePresence>
       </div>
  
-      <AnimatePresence initial={false}>
+      <aAnimatePresence initial={false}>
         {secondImage ? (
-          <motion.img
-            className={cn(
+          <amotion.img
+            className={acn(
               "absolute top-0 left-0 z-[19]  rounded-2xl w-full h-full select-none object-cover",
               secondImageClassname
             )}
@@ -237,9 +237,9 @@ export const Compare = ({
             draggable={false}
           />
         ) : null}
-      </AnimatePresence>
+      </aAnimatePresence>
     </div>
   );
 };
  
-const MemoizedSparklesCore = React.memo(SparklesCore);
+const aMemoizedSparklesCore = aReact.memo(aSparklesCore);
